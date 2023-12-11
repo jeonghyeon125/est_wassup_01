@@ -7,5 +7,5 @@ class RootMeanSquaredLogError(MeanSquaredLogError):
     super().__init__()
   
   def compute(self):
-    print(sqrt(super().compute()))
+    # print(sqrt(super().compute()))
     return sqrt(super().compute())

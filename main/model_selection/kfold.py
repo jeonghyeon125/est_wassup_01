@@ -18,7 +18,7 @@ class KFoldCV:
   def run(self):
     manual_seed(2023)
     kfold = KFold(n_splits=self.e_m.n_split, shuffle=False)
-    metrics = {'trn_rmse': [], 'val_rmse': []}
+    metrics = {'trn_rmsle': [], 'val_rmsle': [], 'trn_history': [], 'val_history': []}
     X = self.e_m.get_X()
     y = self.e_m.get_y()
     for i, (trn_idx, val_idx) in enumerate(kfold.split(X)):
@@ -32,18 +32,23 @@ class KFoldCV:
       dl_trn = DataLoader(ds_trn, **self.e_m.dataloader_params)
       dl_val = DataLoader(ds_val, **self.e_m.dataloader_params)
 
+      metrics['trn_history'].append([])
+      metrics['val_history'].append([])
       pbar = trange(self.e_m.epochs) #trange Tqdm + range
       for _ in pbar:
         Train.train_one_epoch(**{**self.e_m.get_train_parameters(), 'data_loader': dl_trn})
-        trn_rmse = self.e_m.metric.compute().item()
+        trn_rmsle = self.e_m.metric.compute().item()
         self.e_m.metric.reset()
         
         Evaluate.run(**{**self.e_m.get_eval_parameters(), 'data_loader': dl_val})
-        val_rmse = self.e_m.metric.compute().item()
+        val_rmsle = self.e_m.metric.compute().item()
         self.e_m.metric.reset()
-        pbar.set_postfix(trn_rmse=trn_rmse, val_rmse=val_rmse)
-      metrics['trn_rmse'].append(trn_rmse)
-      metrics['val_rmse'].append(val_rmse)
+        
+        metrics['trn_history'][i].append(trn_rmsle)
+        metrics['val_history'][i].append(trn_rmsle)
+        pbar.set_postfix(trn_rmsle=trn_rmsle, val_rmsle=val_rmsle)
+      metrics['trn_rmsle'].append(trn_rmsle)
+      metrics['val_rmsle'].append(val_rmsle)
     return pd.DataFrame(metrics)
 
   def __call__(self):

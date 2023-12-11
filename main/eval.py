@@ -14,7 +14,7 @@ if __name__ == "__main__":
   eval_maker = EvalMaker(**config)
   cv = KFoldCV(eval_maker)
   res = cv()
-  res = pd.concat([res, res.apply(['mean', 'std'])])
+  res = pd.concat([res, res.iloc[:,:2].apply(['mean', 'std'])])
   print(res)
   create_path_if_not_exists(eval_maker.output_eval)
   res.to_csv(eval_maker.output_eval)
