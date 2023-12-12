@@ -1,14 +1,14 @@
 # Custom added
-*.csv
-*.csv.gz
+main/data/origin/*
 *.zip
 *.pth
 *DS_Store
-histories/*
+main/histories/*
+examination/sundeul/externals/*
 test/*
+.vscode/*
 *.gpkg
 *.gpkg-*
-
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

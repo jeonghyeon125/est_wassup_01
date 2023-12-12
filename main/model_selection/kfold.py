@@ -1,14 +1,11 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from makers import EvalMaker
 from sklearn.model_selection import KFold
-from torch import nn, manual_seed
-import torch.nn.functional as F
+from torch import manual_seed
 from torch.utils.data import DataLoader
 from torch.utils.data import TensorDataset
 from tqdm.auto import trange
 from trains import Evaluate, Train
-from typing import Type
-
 import pandas as pd
 
 
@@ -18,7 +15,14 @@ class KFoldCV:
   def run(self):
     manual_seed(2023)
     kfold = KFold(n_splits=self.e_m.n_split, shuffle=False)
-    metrics = {'trn_rmsle': [], 'val_rmsle': [], 'trn_history': [], 'val_history': []}
+    main_metric = self.e_m.main_metric
+    trn_main_metric = f'trn_{main_metric}'
+    val_main_metric = f'val_{main_metric}'
+    metrics = {trn_main_metric: [], val_main_metric: [], 'trn_history': [], 'val_history': []}
+    
+    trn_metrics = self.e_m.metrics['trn']
+    val_metrics = self.e_m.metrics['val']
+    
     X = self.e_m.get_X()
     y = self.e_m.get_y()
     for i, (trn_idx, val_idx) in enumerate(kfold.split(X)):
@@ -29,26 +33,26 @@ class KFoldCV:
       ds_trn = TensorDataset(X_trn, y_trn)
       ds_val = TensorDataset(X_val, y_val)
 
-      dl_trn = DataLoader(ds_trn, **self.e_m.dataloader_params)
+      dl_trn = DataLoader(ds_trn, shuffle=True, **self.e_m.dataloader_params)
       dl_val = DataLoader(ds_val, **self.e_m.dataloader_params)
-
-      metrics['trn_history'].append([])
-      metrics['val_history'].append([])
+      
       pbar = trange(self.e_m.epochs) #trange Tqdm + range
+      trn_values = {k: [] for k in trn_metrics.keys()}
+      val_values = {k: [] for k in val_metrics.keys()}
       for _ in pbar:
         Train.train_one_epoch(**{**self.e_m.get_train_parameters(), 'data_loader': dl_trn})
-        trn_rmsle = self.e_m.metric.compute().item()
-        self.e_m.metric.reset()
+        for k,v in trn_metrics.compute().items(): trn_values[k].append(self.e_m.calc_multi_output_weight(v))
+        trn_metrics.reset()
         
         Evaluate.run(**{**self.e_m.get_eval_parameters(), 'data_loader': dl_val})
-        val_rmsle = self.e_m.metric.compute().item()
-        self.e_m.metric.reset()
+        for k,v in val_metrics.compute().items(): val_values[k].append(self.e_m.calc_multi_output_weight(v))
+        val_metrics.reset()
         
-        metrics['trn_history'][i].append(trn_rmsle)
-        metrics['val_history'][i].append(trn_rmsle)
-        pbar.set_postfix(trn_rmsle=trn_rmsle, val_rmsle=val_rmsle)
-      metrics['trn_rmsle'].append(trn_rmsle)
-      metrics['val_rmsle'].append(val_rmsle)
+        pbar.set_postfix({trn_main_metric: trn_values[trn_main_metric][-1], val_main_metric: val_values[val_main_metric][-1]})
+      metrics['trn_history'].append(trn_values)
+      metrics['val_history'].append(val_values)
+      metrics[trn_main_metric].append(trn_values[trn_main_metric][-1])
+      metrics[val_main_metric].append(val_values[val_main_metric][-1])
     return pd.DataFrame(metrics)
 
   def __call__(self):
